@@ -1,0 +1,525 @@
+{
+  "name": "ai email writer",
+  "nodes": [
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "models/gemini-3-flash-preview",
+          "cachedResultName": "Gemini 3 Flash Preview",
+          "cachedResultUrl": ""
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "=you are an helpful email assistant , you job is to read all upcoming email summarise them into 1 line sentence add see whether it need a reply or not if yes then generate a reply in polite and proffesional tone and make draft in html format so that it always ready to send .\n",
+              "role": "model"
+            },
+            {
+              "content": "=You are an AI email assistant.\n\nAnalyze the email provided below and return the following:\n\n1. Summarize the email in exactly one line.\n2. Determine whether the email requires a reply (Yes/No).\n3. If a reply is needed, draft a polite, professional, and contextually appropriate response.\n4. If no reply is needed, set the suggested reply to \"NA\".\n\nEmail:\n{{ $json.text }}\n\nReturn ONLY valid JSON in this exact structure:\n\n{\n  \"summary\": \"One-line summary of the email\",\n  \"reply needed\": \"Yes/No\",\n  \"suggested reply\": \"Professional reply or NA\"\n}\n\nRules:\n- Do not include Markdown or code fences.\n- Do not add explanations outside the JSON.\n- Never invent facts or commitments.\n- Keep replies concise, polite, and professional.\n- Return valid JSON only."
+            }
+          ]
+        },
+        "jsonOutput": true,
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        224,
+        224
+      ],
+      "id": "e7dabd8f-9e64-496c-b35c-98f3fc4d4e94",
+      "name": "personal accont",
+      "credentials": {
+        "googlePalmApi": {
+          "id": null,
+          "name": "",
+          "__aiGatewayManaged": true
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "\nconst raw = $json.content.parts[0].text;\n\nconst parsed = JSON.parse(raw);\n\nreturn {\n  json: {\n    summary: parsed.summary,\n    reply_needed: parsed[\"reply needed\"],\n    suggested_reply: parsed[\"suggested reply\"]\n  }\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        576,
+        224
+      ],
+      "id": "85095bcf-fc28-425a-b339-10f9e31c3ac2",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "subject": "=Re :{{ $('Gmail Trigger').item.json.headers.subject }}",
+        "emailType": "html",
+        "message": "={{ $json.suggested_reply }}",
+        "options": {
+          "threadId": "={{ $('Gmail Trigger').item.json.threadId }}",
+          "sendTo": "={{ $('Gmail Trigger').item.json.headers.from }}"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1024,
+        128
+      ],
+      "id": "a0ce9d38-de6c-4b47-9696-01d50c9d5302",
+      "name": "Create a draft",
+      "webhookId": "f7fbb1fc-fb54-4915-bca0-b32a31721bcf",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "TIK2lyTuv4lsVQpo",
+          "name": "personal account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "cfa63aab-ac45-4300-842b-7f7882a048d7",
+              "leftValue": "={{ $json.reply_needed }}",
+              "rightValue": "No",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        800,
+        224
+      ],
+      "id": "ddcfc6e2-84a4-4163-9e0f-8c11f1bba341",
+      "name": "if reply needed"
+    },
+    {
+      "parameters": {
+        "operation": "sendAndWait",
+        "chatId": "8811847259",
+        "message": "=you got an email which need an reply.\ni am suggesting you a reply if you want to do change you can do it in gmail drafts section \n\nhere is summary  - {{ $('if reply needed').item.json.summary }}\n\nhere is the suggested reply - {{ $('if reply needed').item.json.suggested_reply }}\n\n\n approve Yes/no?",
+        "approvalOptions": {
+          "values": {
+            "approvalType": "double"
+          }
+        },
+        "options": {
+          "limitWaitTime": {
+            "values": {
+              "resumeAmount": 15,
+              "resumeUnit": "minutes"
+            }
+          }
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1248,
+        128
+      ],
+      "id": "2e8a8a32-e755-42c6-a33c-3fa21248bf67",
+      "name": "Send message and wait for response",
+      "webhookId": "5c8c69fe-1329-4cb0-aa5a-3014937feb6a",
+      "credentials": {
+        "telegramApi": {
+          "id": "r4HRX7J8c3E6DpoD",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "operation": "get",
+        "messageId": "={{ $('Create a draft').item.json.id }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        1696,
+        -64
+      ],
+      "id": "ff11fcbf-cbd6-4a07-a9a5-3c1c57615cf6",
+      "name": "get original draft",
+      "webhookId": "9318d9c6-d251-4370-aec7-c284400ead29",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "TIK2lyTuv4lsVQpo",
+          "name": "personal account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://gmail.googleapis.com/gmail/v1/users/me/drafts/send",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "gmailOAuth2",
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "id",
+              "value": "={{ $json.id }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.5,
+      "position": [
+        1920,
+        -64
+      ],
+      "id": "5355c41c-9cad-4faf-a623-a5f79524d076",
+      "name": "HTTP Request",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "TIK2lyTuv4lsVQpo",
+          "name": "personal account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "8811847259",
+        "text": "=you got an email  here is summary of that \n\n{{ $json.summary }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        1920,
+        512
+      ],
+      "id": "08f6f1b3-a66c-433d-a3ad-4cd696db74a7",
+      "name": "alert for the new received message",
+      "webhookId": "5c8c69fe-1329-4cb0-aa5a-3014937feb6a",
+      "credentials": {
+        "telegramApi": {
+          "id": "r4HRX7J8c3E6DpoD",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "maxResults": 1,
+        "filters": {
+          "labelIds": [
+            "INBOX"
+          ],
+          "readStatus": "unread"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.4,
+      "position": [
+        0,
+        224
+      ],
+      "id": "07e171b0-2c74-44c4-9881-737e77c596bb",
+      "name": "Gmail Trigger",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "TIK2lyTuv4lsVQpo",
+          "name": "personal account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "markAsRead",
+        "messageId": "={{ $('Gmail Trigger').item.json.id }}"
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        2144,
+        128
+      ],
+      "id": "17ec8b2b-587a-4b07-b31d-fe7de60b4e6b",
+      "name": "Mark a message as read",
+      "webhookId": "99499e4c-ff30-4319-b85b-47fbd9dc8b46",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "TIK2lyTuv4lsVQpo",
+          "name": "personal account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1920,
+        320
+      ],
+      "id": "bb4d0846-b888-44f8-a3d3-074287369631",
+      "name": "No Operation, do nothing1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "d6be4739-5cf0-4284-a9e6-f69bed1794ad",
+              "leftValue": "={{ $json.data.approved }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1472,
+        128
+      ],
+      "id": "6e0e8bfb-61b2-43af-9afc-3328fecb4336",
+      "name": "check if approved or not"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 4
+          },
+          "conditions": [
+            {
+              "id": "61e71248-de70-4ebd-94da-c376e2215587",
+              "leftValue": "={{ $json.data.approved }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.4,
+      "position": [
+        1696,
+        224
+      ],
+      "id": "f5b8ad82-d8e5-4533-a758-ca0629dba960",
+      "name": "check unapproved item due to response"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "personal accont": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "if reply needed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "if reply needed": {
+      "main": [
+        [
+          {
+            "node": "Create a draft",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "alert for the new received message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create a draft": {
+      "main": [
+        [
+          {
+            "node": "Send message and wait for response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send message and wait for response": {
+      "main": [
+        [
+          {
+            "node": "check if approved or not",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "get original draft": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "personal accont",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "alert for the new received message": {
+      "main": [
+        [
+          {
+            "node": "Mark a message as read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Mark a message as read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check if approved or not": {
+      "main": [
+        [
+          {
+            "node": "get original draft",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "check unapproved item due to response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check unapproved item due to response": {
+      "main": [
+        [
+          {
+            "node": "Mark a message as read",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Operation, do nothing1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": true,
+    "timeSavedMode": "fixed",
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "versionId": "9717214f-0fcc-4841-99c4-c751367b0e4d",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "8d71ad9ce251da26c064dec8826d6a758f8a63f8c2fac241bff758994a8fea52"
+  },
+  "nodeGroups": [],
+  "id": "xdb5OTscRShSYpsB",
+  "tags": []
+}
